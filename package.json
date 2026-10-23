@@ -1,0 +1,19 @@
+{
+  "name": "bestbee-sabashi-emailservice",
+  "version": "1.0.0",
+  "description": "Multi-tenant Email Service using Node.js, Express, and Zoho Mail",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@ngrok/ngrok": "^1.7.0",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.13",
+    "sqlite3": "^5.1.7"
+  }
+}
