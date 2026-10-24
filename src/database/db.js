@@ -42,17 +42,30 @@ function initDb() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Email transmission logs
+    // Enhanced Audit / Email transmission logs table with migration check
     db.run(`CREATE TABLE IF NOT EXISTS email_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id TEXT NOT NULL,
-      sender TEXT NOT NULL,
-      recipient TEXT NOT NULL,
+      endpoint TEXT,
+      tenant TEXT,
+      sender TEXT,
+      recipients TEXT,
       subject TEXT,
+      provider_used TEXT,
+      fallback_used INTEGER DEFAULT 0,
+      brevo_failure_reason TEXT,
       status TEXT NOT NULL,
       error_message TEXT,
-      sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, () => {
+      // Add columns if they don't exist in older table versions
+      db.run(`ALTER TABLE email_logs ADD COLUMN endpoint TEXT`, () => {});
+      db.run(`ALTER TABLE email_logs ADD COLUMN tenant TEXT`, () => {});
+      db.run(`ALTER TABLE email_logs ADD COLUMN recipients TEXT`, () => {});
+      db.run(`ALTER TABLE email_logs ADD COLUMN provider_used TEXT`, () => {});
+      db.run(`ALTER TABLE email_logs ADD COLUMN fallback_used INTEGER DEFAULT 0`, () => {});
+      db.run(`ALTER TABLE email_logs ADD COLUMN brevo_failure_reason TEXT`, () => {});
+    });
 
     // Audit logs
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (

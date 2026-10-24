@@ -62,25 +62,44 @@ async function runTests() {
     assert.ok(data.accessToken);
     console.log('✓ Token refresh passed');
 
-    // 5. Test Namespace Email Endpoint Routing (e.g., /api/admin/email/send)
-    // Even if SMTP auth fails without real credentials, the endpoint routing & validation should accept the authenticated request
-    res = await fetch(`${baseUrl}/api/admin/email/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({
-        to: 'test@example.com',
-        subject: 'Test Admin Email',
-        text: 'Testing admin namespace'
-      })
-    });
-    // We expect either 200 (if SMTP mocked/configured) or 500 (if invalid SMTP credentials in test environment),
-    // but crucially NOT 404 (route exists) and NOT 401/403 (auth works).
-    assert.notStrictEqual(res.status, 404);
-    assert.notStrictEqual(res.status, 401);
-    console.log('✓ Namespace email routing (/api/admin/email/send) verified');
+    // 5. Test Multiple Endpoints (Admin, Support, Account, CEO) with Single and Bulk formats
+    const endpoints = [
+      '/api/admin/email/send',
+      '/api/admin/email/sendbulk',
+      '/api/support/email/send',
+      '/api/support/email/sendbulk',
+      '/api/account/email/send',
+      '/api/account/email/sendbulk',
+      '/api/ceo/email/send',
+      '/api/ceo/email/sendbulk'
+    ];
+
+    for (const ep of endpoints) {
+      const isBulk = ep.includes('sendbulk');
+      const bodyPayload = isBulk ? {
+        recipients: ['recipient1@example.com', 'recipient2@example.com', 'recipient1@example.com'], // duplicate to test deduplication
+        subject: 'Test Bulk Email',
+        text: 'Bulk message testing'
+      } : {
+        to: 'recipient@example.com',
+        subject: 'Test Single Email',
+        text: 'Single message testing'
+      };
+
+      res = await fetch(`${baseUrl}${ep}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(bodyPayload)
+      });
+
+      // Verify route exists and handles authentication correctly
+      assert.notStrictEqual(res.status, 404);
+      assert.notStrictEqual(res.status, 401);
+      console.log(`✓ Verified route ${ep}`);
+    }
 
     console.log('\nAll integration tests passed successfully!');
   } finally {
