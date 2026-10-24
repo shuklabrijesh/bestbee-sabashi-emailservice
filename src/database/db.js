@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const logger = require('../utils/logger');
 
 const dataDir = path.join(__dirname, '../../data');
 if (!fs.existsSync(dataDir)) {
@@ -8,17 +9,20 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const dbPath = path.join(dataDir, 'email_service.db');
+logger.trace(`Opening SQLite database at ${dbPath}`);
+
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
-    console.error('Error opening database', err.message);
+    logger.error('Error opening database', err.message);
   } else {
-    console.log('Connected to the SQLite database.');
+    logger.info('Connected to the SQLite database.');
     initDb();
   }
 });
 
 function initDb() {
   db.serialize(() => {
+    logger.trace('Initializing database tables');
     // Clients table
     db.run(`CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,

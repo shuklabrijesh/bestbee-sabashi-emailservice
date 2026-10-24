@@ -2,6 +2,7 @@ require('dotenv').config();
 
 module.exports = {
   port: process.env.PORT || 3000,
+  logLevel: process.env.APP_LOG_LEVEL || 'warn',
   jwtSecret: process.env.JWT_SECRET || 'fallback_secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '60m',
   refreshTokenExpiresDays: parseInt(process.env.REFRESH_TOKEN_EXPIRES_DAYS || '30', 10),

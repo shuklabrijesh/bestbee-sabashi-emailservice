@@ -1,33 +1,38 @@
 const nodemailer = require('nodemailer');
 const config = require('../config/config');
 const db = require('../database/db');
+const logger = require('../utils/logger');
+
+// Mapping of namespace prefixes to their respective Zoho sender emails
+const SENDER_MAPPING = {
+  admin: 'admin.bestbee@bestbee-sabashi.online',
+  support: 'support.bestbee@bestbee-sabashi.online',
+  account: 'account.bestbee@bestbee-sabashi.online',
+  ceo: 'shashishukla@bestbee-sabashi.online'
+};
 
 class EmailService {
-  static async getTransporter(senderEmail = null) {
+  static async getTransporterForNamespace(namespace) {
+    const senderEmail = SENDER_MAPPING[namespace] || config.zoho.email;
+    logger.trace(`Resolving SMTP configuration for namespace "${namespace}" -> sender: ${senderEmail}`);
+
     return new Promise((resolve, reject) => {
-      let query = 'SELECT * FROM smtp_configs WHERE is_default = 1';
-      let params = [];
-
-      if (senderEmail) {
-        query = 'SELECT * FROM smtp_configs WHERE email = ?';
-        params = [senderEmail];
-      }
-
-      db.get(query, params, (err, row) => {
+      db.get('SELECT * FROM smtp_configs WHERE email = ?', [senderEmail], (err, row) => {
         if (err || !row) {
-          // Fallback to env config
+          logger.warn(`No specific DB SMTP config found for ${senderEmail}, falling back to environment config.`);
           const transporter = nodemailer.createTransport({
             host: config.zoho.smtpHost,
             port: config.zoho.smtpPort,
-            secure: config.zoho.smtpPort === 465, // true for 465, false for other ports
+            secure: config.zoho.smtpPort === 465,
             auth: {
-              user: config.zoho.email,
+              user: senderEmail || config.zoho.email,
               pass: config.zoho.password
             }
           });
-          return resolve({ transporter, sender: config.zoho.email });
+          return resolve({ transporter, sender: senderEmail || config.zoho.email });
         }
 
+        logger.trace(`Using SMTP configuration from database for ${row.email}`);
         const transporter = nodemailer.createTransport({
           host: row.host,
           port: row.port,
@@ -42,9 +47,10 @@ class EmailService {
     });
   }
 
-  static async sendEmail({ clientId, sender, to, subject, text, html }) {
+  static async sendEmail({ clientId, namespace, to, subject, text, html }) {
+    logger.info(`Attempting to send email for client ${clientId} via namespace [${namespace}] to ${to}`);
     try {
-      const { transporter, sender: resolvedSender } = await EmailService.getTransporter(sender);
+      const { transporter, sender: resolvedSender } = await EmailService.getTransporterForNamespace(namespace);
       const mailOptions = {
         from: resolvedSender,
         to,
@@ -54,6 +60,7 @@ class EmailService {
       };
 
       const info = await transporter.sendMail(mailOptions);
+      logger.info(`Email successfully sent from ${resolvedSender} to ${to} for client ${clientId}. MessageId: ${info.messageId}`);
 
       // Log success
       db.run(
@@ -61,12 +68,15 @@ class EmailService {
         [clientId, resolvedSender, to, subject, 'SUCCESS']
       );
 
-      return { success: true, messageId: info.messageId };
+      return { success: true, sender: resolvedSender, messageId: info.messageId };
     } catch (error) {
+      const failedSender = SENDER_MAPPING[namespace] || config.zoho.email;
+      logger.error(`Failed to send email for client ${clientId} via [${namespace}] to ${to}: ${error.message}`);
+
       // Log failure
       db.run(
         `INSERT INTO email_logs (client_id, sender, recipient, subject, status, error_message) VALUES (?, ?, ?, ?, ?, ?)`,
-        [clientId, sender || config.zoho.email, to, subject, 'FAILED', error.message]
+        [clientId, failedSender, to, subject, 'FAILED', error.message]
       );
 
       throw error;
